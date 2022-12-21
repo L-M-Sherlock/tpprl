@@ -106,13 +106,13 @@ def run(all_user_data_file, user_idx, output_dir, q, N, gpu, reward_kind, K, sho
         set_wt_zero=with_zero_wt,
     )
 
-    config = tf.ConfigProto(
+    config = tf.compat.v1.ConfigProto(
         allow_soft_placement=True,
         log_device_placement=log_device_placement
     )
     config.gpu_options.allow_growth = allow_growth
 
-    sess = tf.Session(config=config)
+    sess = tf.compat.v1.Session(config=config)
     trainer = EB.ExpRecurrentTrainer(
         sim_opts=sim_opts,
         _opts=trainer_opts,

@@ -8,15 +8,15 @@ def variable_summaries(var, name=None):
     if name is None:
         name = var.name.split('/')[-1][:-2]
 
-    with tf.name_scope('summaries-' + name):
-        mean = tf.reduce_mean(var)
-        tf.summary.scalar('mean', mean)
-        with tf.name_scope('stddev'):
-            stddev = tf.sqrt(tf.reduce_mean(tf.square(var - mean)))
-        tf.summary.scalar('stddev', stddev)
-        tf.summary.scalar('max', tf.reduce_max(var))
-        tf.summary.scalar('min', tf.reduce_min(var))
-        tf.summary.histogram('histogram', var)
+    with tf.compat.v1.name_scope('summaries-' + name):
+        mean = tf.reduce_mean(input_tensor=var)
+        tf.compat.v1.summary.scalar('mean', mean)
+        with tf.compat.v1.name_scope('stddev'):
+            stddev = tf.sqrt(tf.reduce_mean(input_tensor=tf.square(var - mean)))
+        tf.compat.v1.summary.scalar('stddev', stddev)
+        tf.compat.v1.summary.scalar('max', tf.reduce_max(input_tensor=var))
+        tf.compat.v1.summary.scalar('min', tf.reduce_min(input_tensor=var))
+        tf.compat.v1.summary.histogram('histogram', var)
 
 
 def _now(raw=False):
@@ -50,7 +50,7 @@ def average_gradients(tower_grads):
 
         # Average over the 'tower' dimension.
         grad = tf.concat(axis=0, values=grads)
-        grad = tf.reduce_mean(grad, 0)
+        grad = tf.reduce_mean(input_tensor=grad, axis=0)
 
         # Keep in mind that the Variables are redundant because they are shared
         # across towers. So .. we will just return the first tower's pointer to

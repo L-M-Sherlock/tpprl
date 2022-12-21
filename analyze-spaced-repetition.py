@@ -16,12 +16,12 @@ import matplotlib.pyplot as plt
 
 import click
 import os
+os.environ["PATH"] += os.pathsep + '/usr/local/bin'
 import numpy as np
 import tpprl.exp_teacher as ET
 from tpprl.utils import _now
 import tensorflow as tf
 from tpprl.plot_utils import latexify, format_axes
-
 
 @click.command()
 @click.argument('initial_difficulty_csv', type=click.Path(exists=True))
@@ -75,13 +75,13 @@ def cmd(initial_difficulty_csv, alpha, beta, save_dir, T, tau, only_cpu, batches
         decay_steps=10,
     )
 
-    config = tf.ConfigProto(
+    config = tf.compat.v1.ConfigProto(
         allow_soft_placement=True,
         log_device_placement=False
     )
     config.gpu_options.allow_growth = True
 
-    sess = tf.Session(config=config)
+    sess = tf.compat.v1.Session(config=config)
     teacher = ET.ExpRecurrentTeacher(
         _opts=teacher_opts,
         sess=sess,
@@ -131,7 +131,7 @@ def cmd(initial_difficulty_csv, alpha, beta, save_dir, T, tau, only_cpu, batches
     Y = {
         'RL': RL_rewards,
         'MEM': [x['reward'] / (-100) for x in rets_mem],
-        'Uniform': [[x['reward'] / (-100) for x in rets_unif]],
+        'Uniform': [x['reward'] / (-100) for x in rets_unif],
     }
 
     box = plt.boxplot([Y['RL'], Y['MEM'], Y['Uniform']],

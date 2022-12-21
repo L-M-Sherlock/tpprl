@@ -10,7 +10,7 @@ from tpprl.utils import _now
 import tensorflow as tf
 import numpy as np
 import sys
-
+tf.compat.v1.disable_eager_execution()
 
 @click.command()
 @click.argument('initial_difficulty_csv', type=click.Path(exists=True))
@@ -38,7 +38,6 @@ def cmd(initial_difficulty_csv, alpha, beta, output_dir, should_restore,
         with_zero_wt):
     """Read initial difficulty of items from INITIAL_DIFFICULTY_CSV, ALPHA and
     BETA, train an optimal teacher and save the results to output_dir."""
-
     with open(initial_difficulty_csv, 'r') as f:
         n_0s = [float(x.strip()) for x in f.readline().split(',')]
 
@@ -77,13 +76,13 @@ def cmd(initial_difficulty_csv, alpha, beta, output_dir, should_restore,
         set_wt_zero=with_zero_wt,
     )
 
-    config = tf.ConfigProto(
+    config = tf.compat.v1.ConfigProto(
         allow_soft_placement=True,
         log_device_placement=False
     )
     config.gpu_options.allow_growth = True
 
-    sess = tf.Session(config=config)
+    sess = tf.compat.v1.Session(config=config)
     teacher = ET.ExpRecurrentTeacher(
         _opts=teacher_opts,
         sess=sess,

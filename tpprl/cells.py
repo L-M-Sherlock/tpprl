@@ -2,7 +2,7 @@ import tensorflow as tf
 import numpy as np
 
 
-class TPPRSigmoidCell(tf.contrib.rnn.RNNCell):
+class TPPRSigmoidCell(tf.compat.v1.nn.rnn_cell.RNNCell):
     """u(t) = k * sigmoid(vt * ht + wt * dt + bt)"""
 
     def __init__(self, hidden_state_size, output_size, src_id, tf_dtype,
@@ -30,30 +30,30 @@ class TPPRSigmoidCell(tf.contrib.rnn.RNNCell):
 
     def int_u(self, dt, c):
         return (self.tf_k / self.tf_wt) * (
-            tf.log1p(tf.exp(c + self.tf_wt * dt)) -
-            tf.log1p(tf.exp(c))
+            tf.math.log1p(tf.exp(c + self.tf_wt * dt)) -
+            tf.math.log1p(tf.exp(c))
         )
 
     def int_u_2(self, dt, c):
         return (np.square(self.tf_k) / self.tf_wt) * (
             tf.sigmoid(-(c + self.tf_wt * dt)) +
-            tf.log1p(tf.exp(c + self.tf_wt * dt)) -
+            tf.math.log1p(tf.exp(c + self.tf_wt * dt)) -
             tf.sigmoid(-c) -
-            tf.log1p(tf.exp(c))
+            tf.math.log1p(tf.exp(c))
         )
 
     def __call__(self, inp, h_prev):
         raw_broadcaster_idx, rank, t_delta = inp
-        inf_batch_size = tf.shape(raw_broadcaster_idx)[0]
+        inf_batch_size = tf.shape(input=raw_broadcaster_idx)[0]
 
         broadcaster_idx = tf.squeeze(raw_broadcaster_idx, axis=-1)
 
         h_next = tf.nn.tanh(
-            tf.nn.embedding_lookup(self.tf_Wm, broadcaster_idx) +
+            tf.nn.embedding_lookup(params=self.tf_Wm, ids=broadcaster_idx) +
             tf.matmul(h_prev, self.tf_Wh, transpose_b=True) +
             tf.matmul(rank, self.tf_Wr, transpose_b=True) +
             tf.matmul(t_delta, self.tf_Wt, transpose_b=True) +
-            tf.transpose(self.tf_Bh),
+            tf.transpose(a=self.tf_Bh),
             name='h_next'
         )
 
@@ -65,9 +65,9 @@ class TPPRSigmoidCell(tf.contrib.rnn.RNNCell):
         # t_0 = tf.zeros(name='zero_time', shape=(inf_batch_size, 1), dtype=self.tf_dtype)
         # u_theta_0 = self.u_theta(t_0, name='u_theta_0')
 
-        LL_log = tf.where(
+        LL_log = tf.compat.v1.where(
             tf.equal(broadcaster_idx, 0),
-            tf.squeeze(tf.log(u_theta), axis=-1),
+            tf.squeeze(tf.math.log(u_theta), axis=-1),
             tf.zeros(dtype=self.tf_dtype, shape=(inf_batch_size,)),
             name='LL_log'
         )
@@ -100,7 +100,7 @@ class TPPRSigmoidCell(tf.contrib.rnn.RNNCell):
         return self._hidden_state_size
 
 
-class TPPRExpCell(tf.contrib.rnn.RNNCell):
+class TPPRExpCell(tf.compat.v1.nn.rnn_cell.RNNCell):
     """u(t) = exp(vt * ht + wt * dt + bt)"""
 
     def __init__(self, hidden_state_size, output_size, src_id, tf_dtype,
@@ -131,16 +131,16 @@ class TPPRExpCell(tf.contrib.rnn.RNNCell):
 
     def __call__(self, inp, h_prev):
         raw_broadcaster_idx, rank, t_delta = inp
-        inf_batch_size = tf.shape(raw_broadcaster_idx)[0]
+        inf_batch_size = tf.shape(input=raw_broadcaster_idx)[0]
 
         broadcaster_idx = tf.squeeze(raw_broadcaster_idx, axis=-1)
 
         h_next = tf.nn.tanh(
-            tf.nn.embedding_lookup(self.tf_Wm, broadcaster_idx) +
+            tf.nn.embedding_lookup(params=self.tf_Wm, ids=broadcaster_idx) +
             tf.matmul(h_prev, self.tf_Wh, transpose_b=True) +
             tf.matmul(rank, self.tf_Wr, transpose_b=True) +
             tf.matmul(t_delta, self.tf_Wt, transpose_b=True) +
-            tf.transpose(self.tf_Bh),
+            tf.transpose(a=self.tf_Bh),
             name='h_next'
         )
 
@@ -150,9 +150,9 @@ class TPPRExpCell(tf.contrib.rnn.RNNCell):
         t_0 = tf.zeros(name='zero_time', shape=(inf_batch_size, 1), dtype=self.tf_dtype)
         u_theta_0 = self.u_theta(h_prev, t_0, name='u_theta_0')
 
-        LL_log = tf.where(
+        LL_log = tf.compat.v1.where(
             tf.equal(broadcaster_idx, 0),
-            tf.squeeze(tf.log(u_theta), axis=-1),
+            tf.squeeze(tf.math.log(u_theta), axis=-1),
             tf.zeros(dtype=self.tf_dtype, shape=(inf_batch_size,))
         )
         # print('LL_log = ', LL_log)
@@ -169,7 +169,7 @@ class TPPRExpCell(tf.contrib.rnn.RNNCell):
 
     def last_LL(self, last_h, last_interval):
         """Calculate the likelihood of the survival term."""
-        inf_batch_size = tf.shape(last_interval)[0]
+        inf_batch_size = tf.shape(input=last_interval)[0]
         t_0 = tf.zeros(name='zero_time_last', shape=(inf_batch_size, 1), dtype=self.tf_dtype)
         u_theta = self.u_theta(last_h, tf.reshape(last_interval, (-1, 1)), name='u_theta_LL_last')
         u_theta_0 = self.u_theta(last_h, t_0, name='u_theta_LL_last_0')
@@ -177,7 +177,7 @@ class TPPRExpCell(tf.contrib.rnn.RNNCell):
 
     def last_loss(self, last_h, last_interval):
         """Calculate the squared loss of the survival term."""
-        inf_batch_size = tf.shape(last_interval)[0]
+        inf_batch_size = tf.shape(input=last_interval)[0]
         t_0 = tf.zeros(name='zero_time_last', shape=(inf_batch_size, 1), dtype=self.tf_dtype)
         u_theta = self.u_theta(last_h, tf.reshape(last_interval, (-1, 1)), name='u_theta_loss_last')
         u_theta_0 = self.u_theta(last_h, t_0, name='u_theta_loss_last_0')
@@ -197,7 +197,7 @@ class TPPRExpCell(tf.contrib.rnn.RNNCell):
         return self._hidden_state_size
 
 
-class TPPRExpCellStacked(tf.contrib.rnn.RNNCell):
+class TPPRExpCellStacked(tf.compat.v1.nn.rnn_cell.RNNCell):
     """u(t) = exp(vt * ht + wt * dt + bt).
     Stacked version.
     """
@@ -224,7 +224,7 @@ class TPPRExpCellStacked(tf.contrib.rnn.RNNCell):
         self.tf_vt = vt
         self.tf_bt = bt
 
-        self.num_cats = tf.shape(Wm)[1]
+        self.num_cats = tf.shape(input=Wm)[1]
 
     def u_theta(self, h, t_delta, name):
         return tf.exp(
@@ -236,13 +236,13 @@ class TPPRExpCellStacked(tf.contrib.rnn.RNNCell):
 
     def __call__(self, inp, h_prev):
         raw_broadcaster_idx, rank, t_delta = inp
-        inf_batch_size = tf.shape(raw_broadcaster_idx)[0]
+        inf_batch_size = tf.shape(input=raw_broadcaster_idx)[0]
 
         broadcaster_idx = tf.squeeze(raw_broadcaster_idx, axis=-1)
         lookup_offset = self.num_cats * tf.range(inf_batch_size)
 
         h_next = tf.nn.tanh(
-            tf.nn.embedding_lookup(self.tf_Wm, broadcaster_idx + lookup_offset) +
+            tf.nn.embedding_lookup(params=self.tf_Wm, ids=broadcaster_idx + lookup_offset) +
             tf.einsum('aij,aj->ai', self.tf_Wh, h_prev) +
             tf.einsum('aij,aj->ai', self.tf_Wr, rank) +
             tf.einsum('aij,aj->ai', self.tf_Wt, t_delta) +
@@ -256,9 +256,9 @@ class TPPRExpCellStacked(tf.contrib.rnn.RNNCell):
         t_0 = tf.zeros(name='zero_time', shape=(inf_batch_size, 1), dtype=self.tf_dtype)
         u_theta_0 = self.u_theta(h_prev, t_0, name='u_theta_0')
 
-        LL_log = tf.where(
+        LL_log = tf.compat.v1.where(
             tf.equal(broadcaster_idx, 0),
-            tf.squeeze(tf.log(u_theta), axis=-1),
+            tf.squeeze(tf.math.log(u_theta), axis=-1),
             tf.zeros(dtype=self.tf_dtype, shape=(inf_batch_size,))
         )
         # print('LL_log = ', LL_log)
@@ -279,7 +279,7 @@ class TPPRExpCellStacked(tf.contrib.rnn.RNNCell):
 
     def last_LL(self, last_h, last_interval):
         """Calculate the likelihood of the survival term."""
-        inf_batch_size = tf.shape(last_interval)[0]
+        inf_batch_size = tf.shape(input=last_interval)[0]
         t_0 = tf.zeros(name='zero_time_last', shape=(inf_batch_size, 1), dtype=self.tf_dtype)
         u_theta_0 = self.u_theta(last_h, t_0, name='u_theta_LL_last_0')
         u_theta = self.u_theta(last_h, tf.reshape(last_interval, (-1, 1)), name='u_theta_LL_last')
@@ -290,7 +290,7 @@ class TPPRExpCellStacked(tf.contrib.rnn.RNNCell):
 
     def last_loss(self, last_h, last_interval):
         """Calculate the squared loss of the survival term."""
-        inf_batch_size = tf.shape(last_interval)[0]
+        inf_batch_size = tf.shape(input=last_interval)[0]
         t_0 = tf.zeros(name='zero_time_last', shape=(inf_batch_size, 1), dtype=self.tf_dtype)
         u_theta_0 = self.u_theta(last_h, t_0, name='u_theta_loss_last_0')
         u_theta = self.u_theta(last_h, tf.reshape(last_interval, (-1, 1)), name='u_theta_loss_last')
@@ -313,7 +313,7 @@ class TPPRExpCellStacked(tf.contrib.rnn.RNNCell):
         return self._hidden_state_size
 
 
-class TPPRExpMarkedCellStacked(tf.contrib.rnn.RNNCell):
+class TPPRExpMarkedCellStacked(tf.compat.v1.nn.rnn_cell.RNNCell):
     """u(t) = exp(vt * ht + wt * dt + bt).
     v(t) = softmax(Vy * ht)
 
@@ -342,7 +342,7 @@ class TPPRExpMarkedCellStacked(tf.contrib.rnn.RNNCell):
         self.tf_bt = bt
         self.tf_Vy = Vy
 
-        self.num_cats = tf.shape(Wm)[1]
+        self.num_cats = tf.shape(input=Wm)[1]
 
     def u_theta(self, h, t_delta, name):
         return tf.exp(
@@ -354,13 +354,13 @@ class TPPRExpMarkedCellStacked(tf.contrib.rnn.RNNCell):
 
     def __call__(self, inp, h_prev):
         raw_b_idx, recall, t_delta = inp
-        inf_batch_size = tf.shape(raw_b_idx)[0]
+        inf_batch_size = tf.shape(input=raw_b_idx)[0]
 
         b_idx = tf.squeeze(raw_b_idx, axis=-1)
         lookup_offset = self.num_cats * tf.range(inf_batch_size)
 
         h_next = tf.nn.tanh(
-            tf.nn.embedding_lookup(self.tf_Wm, b_idx + lookup_offset) +
+            tf.nn.embedding_lookup(params=self.tf_Wm, ids=b_idx + lookup_offset) +
             tf.einsum('aij,aj->ai', self.tf_Wh, h_prev) +
             tf.einsum('aij,aj->ai', self.tf_Wr, recall) +
             tf.einsum('aij,aj->ai', self.tf_Wt, t_delta) +
@@ -376,11 +376,11 @@ class TPPRExpMarkedCellStacked(tf.contrib.rnn.RNNCell):
 
         # Calculating entropy of the categorical distribution.
         v_logits = tf.einsum('aij,ai->aj', self.tf_Vy, h_prev, name='v_logits')
-        v_logexpsum = tf.reduce_logsumexp(v_logits, axis=1, keepdims=True, name='v_logexpsum')
+        v_logexpsum = tf.reduce_logsumexp(input_tensor=v_logits, axis=1, keepdims=True, name='v_logexpsum')
         v_probs = tf.nn.softmax(v_logits, axis=1, name='v_probs')
 
         v_entropy = tf.reduce_sum(
-            tf.multiply(-v_probs, v_logits - v_logexpsum),
+            input_tensor=tf.multiply(-v_probs, v_logits - v_logexpsum),
             axis=1,
             keepdims=True,
             name='v_entropy'
@@ -398,8 +398,8 @@ class TPPRExpMarkedCellStacked(tf.contrib.rnn.RNNCell):
 
         # LL calculation
         LL_log = (
-            tf.squeeze(tf.log(u_theta), axis=-1) +
-            tf.log(tf.gather(v_unrolled, b_idx + lookup_offset))
+            tf.squeeze(tf.math.log(u_theta), axis=-1) +
+            tf.math.log(tf.gather(v_unrolled, b_idx + lookup_offset))
         )
 
         if self.assume_wt_zero:
@@ -418,7 +418,7 @@ class TPPRExpMarkedCellStacked(tf.contrib.rnn.RNNCell):
 
     def last_LL(self, last_h, last_interval):
         """Calculate the likelihood of the survival term."""
-        inf_batch_size = tf.shape(last_interval)[0]
+        inf_batch_size = tf.shape(input=last_interval)[0]
         t_0 = tf.zeros(name='zero_time_last', shape=(inf_batch_size, 1), dtype=self.tf_dtype)
         u_theta_0 = self.u_theta(last_h, t_0, name='u_theta_LL_last_0')
         u_theta = self.u_theta(last_h, tf.reshape(last_interval, (-1, 1)), name='u_theta_LL_last')
@@ -429,7 +429,7 @@ class TPPRExpMarkedCellStacked(tf.contrib.rnn.RNNCell):
 
     def last_loss(self, last_h, last_interval):
         """Calculate the squared loss of the survival term."""
-        inf_batch_size = tf.shape(last_interval)[0]
+        inf_batch_size = tf.shape(input=last_interval)[0]
         t_0 = tf.zeros(name='zero_time_last', shape=(inf_batch_size, 1), dtype=self.tf_dtype)
         u_theta_0 = self.u_theta(last_h, t_0, name='u_theta_loss_last_0')
         u_theta = self.u_theta(last_h, tf.reshape(last_interval, (-1, 1)), name='u_theta_loss_last')

@@ -1,11 +1,13 @@
 import numpy as np
 import os
 import tensorflow as tf
+import tf_agents
 import decorated_options as Deco
 import warnings
 import multiprocessing as MP
 import redqueen.utils as RU
 import heapq
+tf.compat.v1.disable_eager_execution()
 
 SAVE_DIR = 'teacher-log'
 MAX_EVENTS = 100000
@@ -346,30 +348,30 @@ class ExpRecurrentTeacher:
             # Global step needs to be on the CPU (Why?)
             self.global_step = tf.Variable(0, name='global_step', trainable=False)
 
-        with tf.variable_scope(self.scope):
-            with tf.variable_scope('hidden_state'):
+        with tf.compat.v1.variable_scope(self.scope):
+            with tf.compat.v1.variable_scope('hidden_state'):
                 with tf.device(var_device):
-                    self.tf_Wm = tf.get_variable(name='Wm', shape=Wm.shape,
-                                                 initializer=tf.constant_initializer(Wm))
-                    self.tf_Wh = tf.get_variable(name='Wh', shape=Wh.shape,
-                                                 initializer=tf.constant_initializer(Wh))
-                    self.tf_Wt = tf.get_variable(name='Wt', shape=Wt.shape,
-                                                 initializer=tf.constant_initializer(Wt))
-                    self.tf_Wr = tf.get_variable(name='Wr', shape=Wr.shape,
-                                                 initializer=tf.constant_initializer(Wr))
-                    self.tf_Bh = tf.get_variable(name='Bh', shape=Bh.shape,
-                                                 initializer=tf.constant_initializer(Bh))
+                    self.tf_Wm = tf.compat.v1.get_variable(name='Wm', shape=Wm.shape,
+                                                 initializer=tf.compat.v1.constant_initializer(Wm))
+                    self.tf_Wh = tf.compat.v1.get_variable(name='Wh', shape=Wh.shape,
+                                                 initializer=tf.compat.v1.constant_initializer(Wh))
+                    self.tf_Wt = tf.compat.v1.get_variable(name='Wt', shape=Wt.shape,
+                                                 initializer=tf.compat.v1.constant_initializer(Wt))
+                    self.tf_Wr = tf.compat.v1.get_variable(name='Wr', shape=Wr.shape,
+                                                 initializer=tf.compat.v1.constant_initializer(Wr))
+                    self.tf_Bh = tf.compat.v1.get_variable(name='Bh', shape=Bh.shape,
+                                                 initializer=tf.compat.v1.constant_initializer(Bh))
 
                     # Needed to calculate the hidden state for one step.
-                    self.tf_h = tf.get_variable(name='h', initializer=tf.zeros((self.num_hidden_states, 1), dtype=self.tf_dtype))
+                    self.tf_h = tf.compat.v1.get_variable(name='h', initializer=tf.zeros((self.num_hidden_states, 1), dtype=self.tf_dtype))
 
-                self.tf_b_idx = tf.placeholder(name='b_idx', shape=1, dtype=tf.int32)
-                self.tf_t_delta = tf.placeholder(name='t_delta', shape=1, dtype=self.tf_dtype)
-                self.tf_recall = tf.placeholder(name='recall', shape=(1, 1), dtype=self.tf_dtype)
+                self.tf_b_idx = tf.compat.v1.placeholder(name='b_idx', shape=1, dtype=tf.int32)
+                self.tf_t_delta = tf.compat.v1.placeholder(name='t_delta', shape=1, dtype=self.tf_dtype)
+                self.tf_recall = tf.compat.v1.placeholder(name='recall', shape=(1, 1), dtype=self.tf_dtype)
 
                 self.tf_h_next = tf.nn.tanh(
                     tf.transpose(
-                        tf.nn.embedding_lookup(self.tf_Wm, self.tf_b_idx, name='b_embed')
+                        a=tf.nn.embedding_lookup(params=self.tf_Wm, ids=self.tf_b_idx, name='b_embed')
                     ) +
                     tf.matmul(self.tf_Wh, self.tf_h) +
                     tf.matmul(self.tf_Wr, self.tf_recall) +
@@ -378,18 +380,18 @@ class ExpRecurrentTeacher:
                     name='h_next'
                 )
 
-            with tf.variable_scope('output'):
+            with tf.compat.v1.variable_scope('output'):
                 with tf.device(var_device):
-                    self.tf_Vy = tf.get_variable(name='Vy', shape=Vy.shape,
-                                                 initializer=tf.constant_initializer(Vy))
-                    self.tf_bt = tf.get_variable(name='bt', shape=bt.shape,
-                                                 initializer=tf.constant_initializer(bt))
-                    self.tf_vt = tf.get_variable(name='vt', shape=vt.shape,
-                                                 initializer=tf.constant_initializer(vt))
+                    self.tf_Vy = tf.compat.v1.get_variable(name='Vy', shape=Vy.shape,
+                                                 initializer=tf.compat.v1.constant_initializer(Vy))
+                    self.tf_bt = tf.compat.v1.get_variable(name='bt', shape=bt.shape,
+                                                 initializer=tf.compat.v1.constant_initializer(bt))
+                    self.tf_vt = tf.compat.v1.get_variable(name='vt', shape=vt.shape,
+                                                 initializer=tf.compat.v1.constant_initializer(vt))
 
                     wt_init = 0.0 if set_wt_zero else wt
-                    self.tf_wt = tf.get_variable(name='wt', shape=wt.shape,
-                                                 initializer=tf.constant_initializer(wt_init))
+                    self.tf_wt = tf.compat.v1.get_variable(name='wt', shape=wt.shape,
+                                                 initializer=tf.compat.v1.constant_initializer(wt_init))
                 # self.tf_t_delta = tf.placeholder(name='t_delta', shape=1, dtype=self.tf_dtype)
                 # self.tf_u_t = tf.exp(
                 #     tf.tensordot(self.tf_vt, self.tf_h, axes=1) +
@@ -400,28 +402,28 @@ class ExpRecurrentTeacher:
 
             # Create a large dynamic_rnn kind of network which can calculate
             # the gradients for a given given batch of simulations.
-            with tf.variable_scope('training'):
-                self.tf_batch_rewards = tf.placeholder(name='rewards',
+            with tf.compat.v1.variable_scope('training'):
+                self.tf_batch_rewards = tf.compat.v1.placeholder(name='rewards',
                                                        shape=(self.tf_batch_size, 1),
                                                        dtype=self.tf_dtype)
-                self.tf_batch_t_deltas = tf.placeholder(name='t_deltas',
+                self.tf_batch_t_deltas = tf.compat.v1.placeholder(name='t_deltas',
                                                         shape=(self.tf_batch_size, self.tf_max_events),
                                                         dtype=self.tf_dtype)
-                self.tf_batch_b_idxes = tf.placeholder(name='b_idxes',
+                self.tf_batch_b_idxes = tf.compat.v1.placeholder(name='b_idxes',
                                                        shape=(self.tf_batch_size, self.tf_max_events),
                                                        dtype=tf.int32)
-                self.tf_batch_recalls = tf.placeholder(name='recalls',
+                self.tf_batch_recalls = tf.compat.v1.placeholder(name='recalls',
                                                        shape=(self.tf_batch_size, self.tf_max_events),
                                                        dtype=self.tf_dtype)
-                self.tf_batch_seq_len = tf.placeholder(name='seq_len',
+                self.tf_batch_seq_len = tf.compat.v1.placeholder(name='seq_len',
                                                        shape=(self.tf_batch_size, 1),
                                                        dtype=tf.int32)
-                self.tf_batch_last_interval = tf.placeholder(name='last_interval',
+                self.tf_batch_last_interval = tf.compat.v1.placeholder(name='last_interval',
                                                              shape=self.tf_batch_size,
                                                              dtype=self.tf_dtype)
 
                 # Inferred batch size
-                inf_batch_size = tf.shape(self.tf_batch_b_idxes)[0]
+                inf_batch_size = tf.shape(input=self.tf_batch_b_idxes)[0]
 
                 self.tf_batch_init_h = tf.zeros(
                     name='init_h',
@@ -431,7 +433,7 @@ class ExpRecurrentTeacher:
 
                 # Stacked version (for performance)
 
-                with tf.name_scope('stacked'):
+                with tf.compat.v1.name_scope('stacked'):
                     with tf.device(var_device):
                         (self.Wm_mini, self.Wr_mini, self.Wh_mini,
                          self.Wt_mini, self.Bh_mini, self.wt_mini,
@@ -452,7 +454,7 @@ class ExpRecurrentTeacher:
 
                         self.rnn_cell_stack = TPPRExpMarkedCellStacked(
                             hidden_state_size=(None, self.num_hidden_states),
-                            output_size=[self.num_hidden_states] + [1] * 4,
+                            output_size=(self.num_hidden_states, 1, 1, 1, 1),
                             tf_dtype=self.tf_dtype,
                             Wm=self.Wm_mini, Wr=self.Wr_mini,
                             Wh=self.Wh_mini, Wt=self.Wt_mini,
@@ -461,11 +463,11 @@ class ExpRecurrentTeacher:
                             Vy=self.Vy_mini,
                             assume_wt_zero=self.set_wt_zero,
                         )
-
+                        
                         ((self.h_states_stack, LL_log_terms_stack,
                           LL_int_terms_stack, loss_terms_stack,
                           entropy_terms_stack),
-                         tf_batch_h_t_mini) = tf.nn.dynamic_rnn(
+                         tf_batch_h_t_mini) = tf.compat.v1.nn.dynamic_rnn(
                             self.rnn_cell_stack,
                             inputs=(tf.expand_dims(self.tf_batch_b_idxes, axis=-1),
                                     tf.expand_dims(self.tf_batch_recalls, axis=-1),
@@ -486,23 +488,23 @@ class ExpRecurrentTeacher:
                         self.LL_last_term_stack = self.rnn_cell_stack.last_LL(tf_batch_h_t_mini, self.tf_batch_last_interval)
                         self.loss_last_term_stack = self.rnn_cell_stack.last_loss(tf_batch_h_t_mini, self.tf_batch_last_interval)
 
-                        self.LL_stack = (tf.reduce_sum(self.LL_log_terms_stack, axis=1) - tf.reduce_sum(self.LL_int_terms_stack, axis=1)) + self.LL_last_term_stack
+                        self.LL_stack = (tf.reduce_sum(input_tensor=self.LL_log_terms_stack, axis=1) - tf.reduce_sum(input_tensor=self.LL_int_terms_stack, axis=1)) + self.LL_last_term_stack
 
                         decay_term = tf.pow(tf.cast(self.global_step, self.tf_dtype), self.decay_q_rate)
                         tf_seq_len = tf.squeeze(self.tf_batch_seq_len, axis=-1)
-                        self.entropy_stack = tf.where(
+                        self.entropy_stack = tf.compat.v1.where(
                             tf.equal(tf_seq_len, 0),
                             tf.zeros(shape=(inf_batch_size,), dtype=self.tf_dtype),
-                            tf.reduce_sum(self.entropy_terms_stack, axis=1) / tf.cast(tf_seq_len, self.tf_dtype),
+                            tf.reduce_sum(input_tensor=self.entropy_terms_stack, axis=1) / tf.cast(tf_seq_len, self.tf_dtype),
                             name='entropy_stack'
                         )
                         self.loss_stack = decay_term * (
-                            (self.q / 2) * (tf.reduce_sum(self.loss_terms_stack, axis=1) +
+                            (self.q / 2) * (tf.reduce_sum(input_tensor=self.loss_terms_stack, axis=1) +
                                             self.loss_last_term_stack) -
                             self.q_entropy * self.entropy_stack
                         )
 
-            with tf.name_scope('calc_u'):
+            with tf.compat.v1.name_scope('calc_u'):
                 with tf.device(var_device):
                     # These are operations needed to calculate u(t) in post-processing.
                     # These can be done entirely in numpy-space, but since we have a
@@ -511,12 +513,12 @@ class ExpRecurrentTeacher:
                     # Otherwise, new additions to the graph were made whenever the
                     # function calc_u was called.
 
-                    self.calc_u_h_states = tf.placeholder(
+                    self.calc_u_h_states = tf.compat.v1.placeholder(
                         name='calc_u_h_states',
                         shape=(self.tf_batch_size, self.tf_max_events, self.num_hidden_states),
                         dtype=self.tf_dtype
                     )
-                    self.calc_u_batch_size = tf.placeholder(
+                    self.calc_u_batch_size = tf.compat.v1.placeholder(
                         name='calc_u_batch_size',
                         shape=(None,),
                         dtype=tf.int32
@@ -544,19 +546,19 @@ class ExpRecurrentTeacher:
         self.all_mini_vars = [self.Wh_mini, self.Wm_mini, self.Wt_mini, self.Bh_mini,
                               self.Wr_mini, self.bt_mini, self.vt_mini, self.wt_mini, self.Vy_mini]
 
-        with tf.name_scope('stack_grad'):
+        with tf.compat.v1.name_scope('stack_grad'):
             with tf.device(var_device):
-                self.LL_grad_stacked = {x: tf.gradients(self.LL_stack, x)
+                self.LL_grad_stacked = {x: tf.gradients(ys=self.LL_stack, xs=x)
                                         for x in self.all_mini_vars}
-                self.loss_grad_stacked = {x: tf.gradients(self.loss_stack, x)
+                self.loss_grad_stacked = {x: tf.gradients(ys=self.loss_stack, xs=x)
                                           for x in self.all_mini_vars}
 
                 self.avg_gradient_stack = []
 
                 # TODO: Can we calculate natural gradients here easily?
                 if with_baseline:
-                    avg_baseline = (tf.reduce_mean(self.tf_batch_rewards, axis=0) +
-                                    tf.reduce_mean(self.loss_stack, axis=0))
+                    avg_baseline = (tf.reduce_mean(input_tensor=self.tf_batch_rewards, axis=0) +
+                                    tf.reduce_mean(input_tensor=self.loss_stack, axis=0))
                 else:
                     avg_baseline = 0.0
 
@@ -575,14 +577,14 @@ class ExpRecurrentTeacher:
                     dim = len(LL_grad.get_shape())
                     if dim == 1:
                         self.avg_gradient_stack.append(
-                            (tf.reduce_mean(LL_grad * coef + loss_grad, axis=0), y)
+                            (tf.reduce_mean(input_tensor=LL_grad * coef + loss_grad, axis=0), y)
                         )
                     elif dim == 2:
                         self.avg_gradient_stack.append(
                             (
                                 tf.reduce_mean(
-                                    LL_grad * tf.tile(tf.reshape(coef, (-1, 1)),
-                                                      [1, tf.shape(LL_grad)[1]]) +
+                                    input_tensor=LL_grad * tf.tile(tf.reshape(coef, (-1, 1)),
+                                                      [1, tf.shape(input=LL_grad)[1]]) +
                                     loss_grad,
                                     axis=0
                                 ),
@@ -593,8 +595,8 @@ class ExpRecurrentTeacher:
                         self.avg_gradient_stack.append(
                             (
                                 tf.reduce_mean(
-                                    LL_grad * tf.tile(tf.reshape(coef, (-1, 1, 1)),
-                                                      [1, tf.shape(LL_grad)[1], tf.shape(LL_grad)[2]]) +
+                                    input_tensor=LL_grad * tf.tile(tf.reshape(coef, (-1, 1, 1)),
+                                                      [1, tf.shape(input=LL_grad)[1], tf.shape(input=LL_grad)[2]]) +
                                     loss_grad,
                                     axis=0
                                 ),
@@ -613,7 +615,7 @@ class ExpRecurrentTeacher:
                     [var for _, var in self.avg_gradient_stack]
                 ))
 
-        self.tf_learning_rate = tf.train.inverse_time_decay(
+        self.tf_learning_rate = tf.compat.v1.train.inverse_time_decay(
             self.learning_rate,
             global_step=self.global_step,
             decay_steps=self.decay_steps,
@@ -621,7 +623,7 @@ class ExpRecurrentTeacher:
         )
 
         self.learning_bump = learning_bump
-        self.opt = tf.train.AdamOptimizer(
+        self.opt = tf.compat.v1.train.AdamOptimizer(
             learning_rate=learning_bump * self.tf_learning_rate,
             beta1=momentum
         )
@@ -634,14 +636,15 @@ class ExpRecurrentTeacher:
 
         # There are other global variables as well, like the ones which the
         # ADAM optimizer uses.
-        self.saver = tf.train.Saver(
-            tf.global_variables(),
+        self.saver = tf.compat.v1.train.Saver(
+            tf.compat.v1.global_variables(),
             keep_checkpoint_every_n_hours=0.25,
             max_to_keep=1000
         )
 
         with tf.device(device_cpu):
-            tf.contrib.training.add_gradients_summaries(self.avg_gradient_stack)
+            # tf.contrib.training.add_gradients_summaries(self.avg_gradient_stack)
+            tf_agents.utils.eager_utils.add_gradients_summaries(self.avg_gradient_stack, None)
 
             for v in self.all_tf_vars:
                 variable_summaries(v)
@@ -658,11 +661,11 @@ class ExpRecurrentTeacher:
             variable_summaries(tf.cast(self.tf_batch_seq_len, self.tf_dtype),
                                name='batch_seq_len')
 
-            self.tf_merged_summaries = tf.summary.merge_all()
+            self.tf_merged_summaries = tf.compat.v1.summary.merge_all()
 
     def initialize(self, finalize=True):
         """Initialize the graph."""
-        self.sess.run(tf.global_variables_initializer())
+        self.sess.run(tf.compat.v1.global_variables_initializer())
         if finalize:
             # No more nodes will be added to the graph beyond this point.
             # Recommended way to prevent memory leaks afterwards, esp. if the
@@ -680,7 +683,7 @@ class ExpRecurrentTeacher:
         if with_summaries:
             assert self.summary_dir is not None
             os.makedirs(self.summary_dir, exist_ok=True)
-            train_writer = tf.summary.FileWriter(self.summary_dir,
+            train_writer = tf.compat.v1.summary.FileWriter(self.summary_dir,
                                                  self.sess.graph)
         train_op = self.sgd_stacked_op
         grad_norm_op = self.grad_norm_stack
