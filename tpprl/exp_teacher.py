@@ -463,7 +463,7 @@ class ExpRecurrentTeacher:
                             Vy=self.Vy_mini,
                             assume_wt_zero=self.set_wt_zero,
                         )
-                        
+
                         ((self.h_states_stack, LL_log_terms_stack,
                           LL_int_terms_stack, loss_terms_stack,
                           entropy_terms_stack),
@@ -1309,3 +1309,50 @@ def sweep_memorize_q(scenario_opts, capacity_cap, q_init, tol=1e-2,
 
     # Step 3: Return
     return q
+
+
+from .train_ssp_mmc import cal_halflife_index, used_interval_list
+
+
+def scheduler(forgetting_rate):
+    halflife = np.log(2) / forgetting_rate
+    h0_index = cal_halflife_index(halflife)
+    interval = used_interval_list[h0_index]
+    return interval
+
+
+def ssp_mmc_baseline(
+        scenario_opts, target_reviews,
+        seed, verbose=True):
+    student = mk_standard_student(scenario_opts, seed=seed * 2)
+    num_items = len(scenario_opts['n_0s'])
+    T, tau = scenario_opts['T'], scenario_opts['tau']
+
+    reviews = []
+    day_cost_limit = round(target_reviews / T)
+
+    for item in range(num_items):
+        next_t_delta = scheduler(student.ns[item])
+        heapq.heappush(reviews, (next_t_delta, item))
+
+    num_reviews = 0
+    review_timings = []
+    for day in range(T):
+        day_cost = 0
+        while day_cost < day_cost_limit:
+            time_in_day = day_cost / day_cost_limit
+            (next_t, item) = heapq.heappop(reviews)
+            student.review(item, day + time_in_day)
+            review_timings.append((item, day + time_in_day))
+            next_t_delta = scheduler(student.ns[item])
+            heapq.heappush(reviews, (day + next_t_delta + time_in_day, item))
+            day_cost += 1
+            num_reviews += 1
+
+    return {
+        'reward': -REWARD_SCALING * np.mean([student.recall(item, T + tau)
+                                             for item in range(num_items)]),
+        'student': student,
+        'num_reviews': num_reviews,
+        'review_timings': review_timings,
+    }

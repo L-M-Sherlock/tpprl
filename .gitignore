@@ -68,3 +68,7 @@ tpprl.summary*/
 tpprl-log*/
 
 .mypy_cache/
+
+.idea
+.DS_Store
+output-*

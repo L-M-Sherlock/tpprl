@@ -103,6 +103,14 @@ def cmd(initial_difficulty_csv, alpha, beta, save_dir, T, tau, only_cpu, batches
 
     num_test_reviews = np.mean([x.get_num_events() for x in RL_test_scens])
 
+    # Performance using ssp_mmc baseline
+    rets_ssp = [
+        ET.ssp_mmc_baseline(
+            scenario_opts, target_reviews=num_test_reviews,
+            seed=seed + 8, verbose=False
+        ) for seed in range(init_seed, init_seed + batches)
+    ]
+
     # Performance using uniform baseline
     rets_unif = [
         ET.uniform_random_baseline(
@@ -112,70 +120,35 @@ def cmd(initial_difficulty_csv, alpha, beta, save_dir, T, tau, only_cpu, batches
     ]
 
     # Performance if using Memorize.
-    q_MEM = ET.sweep_memorize_q(scenario_opts, num_test_reviews, q_init=1.0,
-                                verbose=verbose)
+    # q_MEM = ET.sweep_memorize_q(scenario_opts, num_test_reviews, q_init=1.0,
+    #                             verbose=verbose)
 
-    rets_mem = [
-        ET.memorize_baseline(
-            scenario_opts, q_max=q_MEM,
-            seed=seed + 8, verbose=False)
-        for seed in range(init_seed, init_seed + batches)
-    ]
+    # rets_mem = [
+    #     ET.memorize_baseline(
+    #         scenario_opts, q_max=q_MEM,
+    #         seed=seed + 8, verbose=False)
+    #     for seed in range(init_seed, init_seed + batches)
+    # ]
 
     # Plotting reward (i.e. recall at T + tau)
-
-    plt.figure()
-    latexify(fig_width=2.25, largeFonts=False)
-    colors = sns.color_palette(n_colors=3)
-
-    Y = {
-        'RL': RL_rewards,
-        'MEM': [x['reward'] / (-100) for x in rets_mem],
-        'Uniform': [x['reward'] / (-100) for x in rets_unif],
-    }
-
-    box = plt.boxplot([Y['RL'], Y['MEM'], Y['Uniform']],
-                      whis=0,
-                      showmeans=True,
-                      showfliers=False,
-                      showcaps=False,
-                      patch_artist=True,
-                      medianprops={'linewidth': 1.0},
-                      boxprops={'linewidth': 1.0, 'edgecolor': colors[0],
-                                'facecolor': colors[1], 'alpha': 0.3},
-                      whiskerprops={'linewidth': 0})
-
-    for idx in range(len(colors)):
-        box['boxes'][idx].set_facecolor(colors[idx])
-        box['boxes'][idx].set_edgecolor(colors[idx])
-        box['means'][idx].set_markersize(5)
-        box['means'][idx].set_markerfacecolor(colors[idx])
-        box['medians'][idx].set_color(colors[idx])
-
-    plt.yticks([0.0, 0.25, 0.50], ['0\%', '25\%', '50\%'])
-    plt.xticks([1, 2, 3], [r'\textsc{TPPRL}', r'\textsc{Memorize}', 'Uniform'])
-    plt.tight_layout()
-    format_axes(plt.gca())
 
     plot_base = './output-plots/'
     os.makedirs(plot_base, exist_ok=True)
 
-    plt.savefig(os.path.join(plot_base, 'recall-results-{}-{}.pdf'.format(T, tau)),
-                bbox_inches='tight', pad_inches=0)
-
     # Plotting item difficulty
 
-    plt.figure()
     latexify(fig_width=2.25, largeFonts=False)
+    plt.figure()
     colors = sns.color_palette(n_colors=3)
 
     Y = {
         'RL': [scenario_opts['n_0s'][item]  for x in RL_test_scens for item in x.items],
-        'MEM': [scenario_opts['n_0s'][item]  for x in rets_mem for item, _ in x['review_timings']],
-        'Uniform': [scenario_opts['n_0s'][item]  for x in rets_unif for item, _ in x['review_timings']]
+        # 'MEM': [scenario_opts['n_0s'][item]  for x in rets_mem for item, _ in x['review_timings']],
+        'Uniform': [scenario_opts['n_0s'][item]  for x in rets_unif for item, _ in x['review_timings']],
+        'SSP': [scenario_opts['n_0s'][item]  for x in rets_ssp for item, _ in x['review_timings']]
     }
 
-    box = plt.boxplot([Y['RL'], Y['MEM'], Y['Uniform']],
+    box = plt.boxplot([Y['SSP'], Y['RL'], Y['Uniform']],
                       whis=0,
                       showmeans=True,
                       showfliers=False,
@@ -189,18 +162,60 @@ def cmd(initial_difficulty_csv, alpha, beta, save_dir, T, tau, only_cpu, batches
     for idx in range(len(colors)):
         box['boxes'][idx].set_facecolor(colors[idx])
         box['boxes'][idx].set_edgecolor(colors[idx])
-        box['means'][idx].set_markersize(5)
+        box['means'][idx].set_markersize(3)
         box['means'][idx].set_markerfacecolor(colors[idx])
+        box['means'][idx].set_markeredgecolor(colors[idx])
         box['medians'][idx].set_color(colors[idx])
 
-    plt.xticks([1, 2, 3], [r'\textsc{TPPRL}', r'\textsc{Memorize}', 'Uniform'])
+    plt.xticks([1, 2, 3], [r'\textsc{SSP}', r'\textsc{TPPRL}', 'Uniform'])
     plt.tight_layout()
     format_axes(plt.gca())
     plt.savefig(os.path.join(plot_base, 'item-difficulty.pdf'), bbox_inches='tight', pad_inches=0)
 
+    plt.figure()
+    colors = sns.color_palette(n_colors=3)
+
+    Y = {
+        'RL': RL_rewards,
+        # 'MEM': [x['reward'] / (-100) for x in rets_mem],
+        'Uniform': [x['reward'] / (-100) for x in rets_unif],
+        'SSP': [x['reward'] / (-100) for x in rets_ssp],
+    }
+
+    for key in Y:
+        print(key, np.asarray(Y[key]).mean())
+
+    box = plt.boxplot([Y['SSP'], Y['RL'], Y['Uniform']],
+                      whis=0,
+                      showmeans=True,
+                      showfliers=False,
+                      showcaps=False,
+                      patch_artist=True,
+                      medianprops={'linewidth': 1.0},
+                      boxprops={'linewidth': 1.0, 'edgecolor': colors[0],
+                                'facecolor': colors[1], 'alpha': 0.3},
+                      whiskerprops={'linewidth': 0})
+
+    for idx in range(len(colors)):
+        box['boxes'][idx].set_facecolor(colors[idx])
+        box['boxes'][idx].set_edgecolor(colors[idx])
+        box['means'][idx].set_markersize(3)
+        box['means'][idx].set_markerfacecolor(colors[idx])
+        box['means'][idx].set_markeredgecolor(colors[idx])
+        box['medians'][idx].set_color(colors[idx])
+
+    plt.yticks([0.0, 0.25, 0.50], ['0\%', '25\%', '50\%'])
+    plt.xticks([1, 2, 3], [r'\textsc{SSP}', r'\textsc{TPPRL}', 'Uniform'])
+    plt.tight_layout()
+    format_axes(plt.gca())
+
+    plt.savefig(os.path.join(plot_base, 'recall-results-{}-{}.pdf'.format(T, tau)),
+                bbox_inches='tight', pad_inches=0)
+
     # Plotting reviews per day
     RL_times = [np.floor(t) for s in RL_test_scens for t in np.cumsum(s.time_deltas)]
-    MEM_times = [np.floor(t) for x in rets_mem for _, t in x['review_timings']]
+    # MEM_times = [np.floor(t) for x in rets_mem for _, t in x['review_timings']]
+    SSP_times = [np.floor(t) for x in rets_ssp for _, t in x['review_timings']]
 
     plt.figure()
     latexify(fig_width=2.25, largeFonts=False)
@@ -208,20 +223,21 @@ def cmd(initial_difficulty_csv, alpha, beta, save_dir, T, tau, only_cpu, batches
     c1, c2 = sns.color_palette(n_colors=2)
 
     f, (a1, a2) = plt.subplots(2, 1)
-    a1.hist(RL_times, bins=np.arange(T + 1), density=True, color=c1, alpha=0.5, label='RL')
+    a1.hist(RL_times, bins=np.arange(T + 1), density=True, color=c2, alpha=0.5, label=r'\textsc{TPPRL}')
     a1.set_yticks([.04, .08])
     a1.set_yticklabels([r'4\%', r'8\%'])
-    a1.set_ylabel('TPPRL')
+    a1.set_ylabel(r'\textsc{TPPRL}')
     a1.set_ylim([0.04, 0.08])
     a1.set_xticks([0.5, 3.5, 6.5, 9.5, 13.5])
     a1.set_xticklabels([1, 4, 7, 10, 14])
     format_axes(a1)
 
-    a2.hist(MEM_times, bins=np.arange(T + 1), density=True, color=c2, alpha=0.5, label=r'\textsc{Mem}')
+    # a2.hist(MEM_times, bins=np.arange(T + 1), density=True, color=c2, alpha=0.5, label=r'\textsc{Mem}')
+    a2.hist(SSP_times, bins=np.arange(T + 1), density=True, color=c1, alpha=0.5, label=r'\textsc{SSP}')
     a2.set_yticks([0, .04, .08], [r'0\%', r'4\%', r'8\%'])
     a2.set_xticks([0.5, 3.5, 6.5, 9.5, 13.5])
     a2.set_xticklabels([1, 4, 7, 10, 14])
-    a2.set_ylabel(r'\textsc{Memorize}')
+    a2.set_ylabel(r'\textsc{SSP}')
     a2.set_ylim([0.04, 0.08])
     a2.set_yticks([.04, .08])
     a2.set_yticklabels([r'4\%', r'8\%'])
